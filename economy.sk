@@ -1,0 +1,70 @@
+options:
+    start_balance: 100 #set to 0 to deactivate this
+    currency: €
+    messages_prefix: &7[&eEconomy&7]
+
+#*** Events
+#automatic creation logic
+on first join:
+    set {balance::%player%} to {@start_balance}
+
+#notification of received payment while offilne logic
+on join:
+    if {payment_notification::%player%::*} is set:
+        send {payment_notification::%player%::*} to player
+        clear {payment_notification::%player%::*}
+
+    #safety check
+    if {balance::%player%} isn't set:
+        set {balance::%player%} to {@start_balance}
+
+#no interaction with bal gui logic
+on inventory click:
+    if name of player's inventory contains "balance":
+        cancel event
+
+#*** Commands
+#view personal balance command
+command /balance:
+    aliases: /bal 
+    trigger:
+        open balGui(player) to player
+ 
+#send money to other players command
+command /pay [<offline player>] [<number>]:
+    usage: {@messages_prefix} &cWrong parameters, use &7/pay <player> <amount>
+    trigger:
+        if arg-1 is set:
+            if {balance::%arg-1%} is set:
+                if arg-2 is set:
+                    if arg-1 isn't player:
+                        if {balance::%player%} >= arg-2:  
+                            sendMoney(player, arg-1, arg-2)
+                            #messages
+                            send "%nl%{@messages_prefix} &aSuccessfully sent %arg-2%{@currency} to %arg-1%%nl%&aNew balance: &f%{balance::%player%}%{@currency}%nl%" to player
+                            if arg-1 is online:   
+                                send "%nl%{@messages_prefix} &aYou received %arg-2%{@currency} from %player%%nl%&aNew balance: &f%{balance::%arg-1%}%{@currency}%nl%" to arg-1
+                            else:
+                                add "%nl%{@messages_prefix} &aYou received %arg-2%{@currency} from %player% while you were offline%nl%&aNew balance: &f%{balance::%arg-1%}%{@currency}%nl%" to {payment_notification::%arg-1%::*}
+                        else:
+                            send "{@messages_prefix} &cError: you don't have enough money" to player
+                    else:
+                        send "{@messages_prefix} &cError: you can't send money to yourself" to player
+                else:
+                    send "{@messages_prefix} &cWrong parameters, use &7/pay <player> <amount>" to player
+            else:
+                send "{@messages_prefix} &c%arg-1% does not have a registered balance" to player
+        else:
+            send "{@messages_prefix} &cWrong parameters, use &7/pay <player> <amount>" to player
+
+#*** Functions
+#money sending logic (no controls)
+function sendMoney(sender: player, receiver: offline player, amount: number):
+    remove {_amount} from {balance::%{_sender}%}
+    add {_amount} to {balance::%{_receiver}%}
+
+#view balance gui
+function balGui(p: player) :: inventory:
+    set {_g} to a new chest inventory with 1 row named "%{_p}% balance"
+    set slot 4 of {_g} to golden carrot named "&7%{_p}%'s balance: %{balance::%{_p}%}%{@currency}"
+    return {_g}
